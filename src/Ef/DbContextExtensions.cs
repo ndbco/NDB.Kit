@@ -2,8 +2,24 @@
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using NDB.Audit.EF.Abstractions;
+using NDB.Audit.EF.Models;
 
 namespace NDB.Kit.Ef;
+
+public sealed record AuditSaveResult<TAudit>(
+    bool Success,
+    string Message,
+    Exception? Exception,
+    IReadOnlyList<TAudit> AuditEntries)
+{
+    public static AuditSaveResult<TAudit> Ok(
+        IReadOnlyList<TAudit> audits)
+        => new(true, "success", null, audits);
+
+    public static AuditSaveResult<TAudit> Fail(Exception ex)
+        => new(false, ex.Message, ex, Array.Empty<TAudit>());
+}
+
 
 /// <summary>
 /// EF Core extensions to enforce safer defaults and integrate audit.
@@ -38,4 +54,25 @@ public static class DbContextExtensions
 
         return result;
     }
+    public static async Task<AuditSaveResult<AuditEntry>>
+        SaveWithAuditResultAsync(
+            this DbContext context,
+            CancellationToken ct = default)
+    {
+        try
+        {
+            var auditService = context.GetService<IAuditService>();
+
+            await context.SaveChangesAsync(ct);
+
+            IReadOnlyList<AuditEntry> audits = await auditService.WriteWithResultAsync(context, ct);
+
+            return AuditSaveResult<AuditEntry>.Ok(audits);
+        }
+        catch (Exception ex)
+        {
+            return AuditSaveResult<AuditEntry>.Fail(ex);
+        }
+    }
+
 }
