@@ -71,17 +71,8 @@ services.AddAutoMapper(cfg =>
 ```
 
 ### EF Core Helpers
-Default AsNoTracking queries
-```
-var vehicles = await db.Query<Vehicle>()
-    .Where(x => x.Status == Status.Active)
-    .ToListAsync();
-
-Save with audit (if NDB.Audit.EF is installed)
-await db.SaveWithAuditAsync();
-```
-Audit is executed automatically when IAuditService is registered.
-
+[Usages Example](src/Ef)
+ 
 ### Guard Clauses
 ```code
 Guard.AgainstNull(request);

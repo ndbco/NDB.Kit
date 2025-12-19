@@ -14,7 +14,7 @@ public sealed record AuditSaveResult<TAudit>(
 {
     public static AuditSaveResult<TAudit> Ok(
         IReadOnlyList<TAudit> audits)
-        => new(true, "success", null, audits);
+        => new(true, "OK", null, audits);
 
     public static AuditSaveResult<TAudit> Fail(Exception ex)
         => new(false, ex.Message, ex, Array.Empty<TAudit>());
@@ -55,9 +55,9 @@ public static class DbContextExtensions
         return result;
     }
     public static async Task<AuditSaveResult<AuditEntry>>
-        SaveWithAuditResultAsync(
-            this DbContext context,
-            CancellationToken ct = default)
+     SaveWithAuditResultAsync(
+         this DbContext context,
+         CancellationToken ct = default)
     {
         try
         {
@@ -65,7 +65,9 @@ public static class DbContextExtensions
 
             await context.SaveChangesAsync(ct);
 
-            IReadOnlyList<AuditEntry> audits = await auditService.WriteWithResultAsync(context, ct);
+            var audits = auditService != null
+                ? await auditService.WriteWithResultAsync(context, ct)
+                : Array.Empty<AuditEntry>();
 
             return AuditSaveResult<AuditEntry>.Ok(audits);
         }
@@ -74,5 +76,4 @@ public static class DbContextExtensions
             return AuditSaveResult<AuditEntry>.Fail(ex);
         }
     }
-
 }
