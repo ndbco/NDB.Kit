@@ -7,10 +7,10 @@
 
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageId>NDB.Kit</PackageId>
-		<Version>1.0.2</Version>
-		<AssemblyVersion>1.0.2.0</AssemblyVersion>
-		<FileVersion>1.0.2.0</FileVersion>
-		<InformationalVersion>1.0.2</InformationalVersion>
+		<Version>1.0.3</Version>
+		<AssemblyVersion>1.0.3.0</AssemblyVersion>
+		<FileVersion>1.0.3.0</FileVersion>
+		<InformationalVersion>1.0.3</InformationalVersion>
 		<Authors>Ilyasin Hafid</Authors>
 		<Company>PT Navigate Digital Boundaries</Company>
 
@@ -32,16 +32,17 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.0.8" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.*" />
+		<PackageReference Include="DocumentFormat.OpenXml" Version="3.*" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="NDB.Abstraction" Version="1.*" />
-		<PackageReference Include="NDB.Audit.EF" Version="1.*" />
+		<None Include="..\README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 	
 	<ItemGroup>
-		<None Include="..\README.md" Pack="true" PackagePath="\" />
+	  <ProjectReference Include="..\..\NDB.Abstraction\src\NDB.Abstraction.csproj" />
+	  <ProjectReference Include="..\..\NDB.Audit.EF\src\NDB.Audit.EF.csproj" />
 	</ItemGroup>
 
 </Project>

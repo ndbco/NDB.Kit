@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using NDB.Abstraction.Markers;
 
 namespace NDB.Kit.Mapping;
 
@@ -6,7 +7,7 @@ namespace NDB.Kit.Mapping;
 /// Implement this interface to define mapping FROM an entity to this model.
 /// </summary>
 /// <typeparam name="TEntity">Source entity</typeparam>
-public interface IMapFrom<TEntity>
+public interface IMapFrom<TModel, TEntity> where TEntity : IEntity
 {
-    void Mapping(IMappingExpression<TEntity, object> map);
+    public void Mapping(IMappingExpression<TEntity, TModel> map);
 }

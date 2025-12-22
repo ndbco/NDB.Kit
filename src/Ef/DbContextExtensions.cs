@@ -54,8 +54,7 @@ public static class DbContextExtensions
 
         return result;
     }
-    public static async Task<AuditSaveResult<AuditEntry>>
-     SaveWithAuditResultAsync(
+    public static async Task<AuditSaveResult<AuditEntry>> SaveWithAuditResultAsync(
          this DbContext context,
          CancellationToken ct = default)
     {
@@ -63,11 +62,11 @@ public static class DbContextExtensions
         {
             var auditService = context.GetService<IAuditService>();
 
-            await context.SaveChangesAsync(ct);
-
             var audits = auditService != null
                 ? await auditService.WriteWithResultAsync(context, ct)
                 : Array.Empty<AuditEntry>();
+
+            await context.SaveChangesAsync(ct);
 
             return AuditSaveResult<AuditEntry>.Ok(audits);
         }

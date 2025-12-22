@@ -7,7 +7,7 @@ namespace NDB.Kit.Mapping;
 /// Implement this interface to define mapping TO an entity from this model.
 /// </summary>
 /// <typeparam name="TEntity">Destination entity</typeparam>
-public interface IMapTo<TEntity, TSource> where TEntity : IEntity
+public interface IMapObject<TSource, TDestination>
 {
-    public void Mapping(IMappingExpression<TSource, TEntity> map);
+    void Mapping(IMappingExpression<TSource, TDestination> map);
 }
