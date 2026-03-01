@@ -3,103 +3,63 @@ using System.Reflection;
 
 namespace NDB.Kit.Mapping;
 
-public class AutoMappingProfile : Profile
+public static class AutoMapping
 {
-    public AutoMappingProfile(params Assembly[] assemblies)
+    public static void Apply(
+        IMapperConfigurationExpression cfg,
+        params Assembly[] assemblies)
     {
-        foreach (var assembly in assemblies)
-            ApplyMappingsFromAssembly(assembly);
-    }
-    public void ApplyMappingsFromAssembly(Assembly assembly)
-    {
-        MethodInfo mapMethod = this.GetType()
+        var mapMethod = typeof(IMapperConfigurationExpression)
             .GetMethods()
-            .First(i => i.Name == "CreateMap" &&
-                        i.GetGenericArguments().Length == 2);
+            .First(m =>
+                m.Name == nameof(IMapperConfigurationExpression.CreateMap) &&
+                m.GetGenericArguments().Length == 2);
 
-        var types_response = assembly.GetExportedTypes()
-            .Where(t => t.GetInterfaces().Any(i =>
-                i.IsGenericType &&
-                i.GetGenericTypeDefinition() == typeof(IMapFrom<,>)))
-            .ToList();
-
-        var types_request = assembly.GetExportedTypes()
-            .Where(t => t.GetInterfaces().Any(i =>
-                i.IsGenericType &&
-                i.GetGenericTypeDefinition() == typeof(IMapTo<,>)))
-            .ToList();
-
-
-        var types_object = assembly.GetTypes()
-            .Where(t => !t.IsAbstract && !t.IsInterface)
-            .Where(t => t.GetInterfaces().Any(i =>
-                i.IsGenericType &&
-                i.GetGenericTypeDefinition() == typeof(IMapObject<,>)))
-            .ToList();
-
-        foreach (var type in types_response)
+        foreach (var assembly in assemblies)
         {
-            var mapInterface = type.GetInterfaces()
-                .First(i => i.GetGenericTypeDefinition() == typeof(IMapFrom<,>));
+            var types = assembly.GetExportedTypes()
+                .Where(t => !t.IsAbstract && !t.IsInterface)
+                .ToList();
 
-            var arguments = mapInterface.GetGenericArguments();
+            foreach (var type in types)
+            {
+                var interfaces = type.GetInterfaces()
+                    .Where(i => i.IsGenericType)
+                    .ToList();
 
-            var instance = Activator.CreateInstance(type)
-                ?? throw new InvalidOperationException(
-                    $"Cannot create instance of {type.FullName}");
+                foreach (var iface in interfaces)
+                {
+                    var genericDef = iface.GetGenericTypeDefinition();
+                    var args = iface.GetGenericArguments();
 
-            var methodInfo = type.GetMethod("Mapping")
-                ?? throw new InvalidOperationException(
-                    $"Mapping method not found on {type.FullName}");
+                    var mappingMethod = type.GetMethod("Mapping");
+                    if (mappingMethod == null)
+                        continue;
 
-            var genericMapMethod = mapMethod.MakeGenericMethod(arguments[1], arguments[0]);
-            var map = genericMapMethod.Invoke(this, null)
-                ?? throw new InvalidOperationException("CreateMap returned null");
+                    var instance = Activator.CreateInstance(type);
+                    if (instance == null)
+                        continue;
 
-            methodInfo.Invoke(instance, new[] { map });
-        }
-
-        foreach (var type in types_request)
-        {
-            var mapInterface = type.GetInterfaces()
-                .First(i => i.GetGenericTypeDefinition() == typeof(IMapTo<,>));
-
-            var arguments = mapInterface.GetGenericArguments();
-
-            var instance = Activator.CreateInstance(type)
-                ?? throw new InvalidOperationException(
-                    $"Cannot create instance of {type.FullName}");
-
-            var methodInfo = type.GetMethod("Mapping")
-                ?? throw new InvalidOperationException(
-                    $"Mapping method not found on {type.FullName}");
-
-            var genericMapMethod = mapMethod.MakeGenericMethod(arguments[1], arguments[0]);
-            var map = genericMapMethod.Invoke(this, null)
-                ?? throw new InvalidOperationException("CreateMap returned null");
-
-            methodInfo.Invoke(instance, new[] { map });
-        }
-
-        foreach (var type in types_object)
-        {
-            var mapInterface = type.GetInterfaces()
-                .First(i => i.GetGenericTypeDefinition() == typeof(IMapObject<,>));
-
-            var arguments = mapInterface.GetGenericArguments();
-
-            var instance = Activator.CreateInstance(type)
-                ?? throw new InvalidOperationException(
-                    $"Cannot create instance of {type.FullName}");
-
-            var methodInfo = type.GetMethod("Mapping")
-                ?? throw new InvalidOperationException(
-                    $"Mapping method not found on {type.FullName}");
-            var genericMapMethod = mapMethod.MakeGenericMethod(arguments[0], arguments[1]);
-            var map = genericMapMethod.Invoke(this, null)
-                ?? throw new InvalidOperationException("CreateMap returned null");
-
-            methodInfo.Invoke(instance, new[] { map });
+                    if (genericDef == typeof(IMapFrom<,>))
+                    {
+                        var genericMap = mapMethod.MakeGenericMethod(args[1], args[0]);
+                        var map = genericMap.Invoke(cfg, null);
+                        mappingMethod.Invoke(instance, new[] { map });
+                    }
+                    else if (genericDef == typeof(IMapTo<,>))
+                    {
+                        var genericMap = mapMethod.MakeGenericMethod(args[1], args[0]);
+                        var map = genericMap.Invoke(cfg, null);
+                        mappingMethod.Invoke(instance, new[] { map });
+                    }
+                    else if (genericDef == typeof(IMapObject<,>))
+                    {
+                        var genericMap = mapMethod.MakeGenericMethod(args[0], args[1]);
+                        var map = genericMap.Invoke(cfg, null);
+                        mappingMethod.Invoke(instance, new[] { map });
+                    }
+                }
+            }
         }
     }
 }

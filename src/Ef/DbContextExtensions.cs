@@ -62,11 +62,11 @@ public static class DbContextExtensions
         {
             var auditService = context.GetService<IAuditService>();
 
+            await context.SaveChangesAsync(ct);
+
             var audits = auditService != null
                 ? await auditService.WriteWithResultAsync(context, ct)
                 : Array.Empty<AuditEntry>();
-
-            await context.SaveChangesAsync(ct);
 
             return AuditSaveResult<AuditEntry>.Ok(audits);
         }
