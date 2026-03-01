@@ -1,144 +1,400 @@
-# NDB.Kit
+﻿# NDB.Kit
 
-**Application productivity kit for modern .NET applications.**
-
-NDB.Kit is a lightweight helper library that sits **above infrastructure**
-and **below business logic**, designed to reduce repetitive boilerplate
-in clean and modular .NET architectures.
-
-This library is intentionally opinionated but **framework-agnostic**.
+> Productivity toolkit for modern .NET applications.
+> Provides EF Core helpers, AutoMapper conventions, Excel export, guards, parsing utilities, and common development extensions.
 
 ---
 
-## What does NDB.Kit provide?
+## Overview
 
-NDB.Kit bundles several **small but powerful building blocks**:
+`NDB.Kit` is a practical utility library designed to reduce boilerplate and enforce safer defaults in enterprise .NET systems.
 
-- AutoMapper convention-based mapping
-- EF Core guardrails and audit integration
-- Enum and primitive parsing helpers
-- Guard clauses for validation
-- Collection and string utilities
-- Result helpers integrated with `NDB.Abstraction`
+It complements `NDB.Abstraction` by providing implementation helpers for:
 
-All modules are **optional** and can be used independently.
+* EF Core query composition (filter, sort, search, paging)
+* EF Core audit integration
+* AutoMapper auto-registration
+* Excel export via OpenXML
+* Guard clauses
+* Enum & primitive parsing
+* Result flow helpers
+* String normalization
+* Base64 utilities
+* Identifier generation
 
----
-
-## Design Principles
-
-- No business logic
-- No UI or HTTP concerns
-- No DAL replacement
-- Safe defaults (e.g. `AsNoTracking`)
-- Explicit, readable, and testable
-- Open-source friendly
+This library focuses on **developer productivity and consistency**, not business logic.
 
 ---
 
-## Installation
+# Package Structure
 
-```bash
-dotnet add package NDB.Kit
+```id="m0n8r1"
+NDB.Kit
+ ├── Base64
+ ├── Collections
+ ├── Ef
+ ├── Enums
+ ├── Excel
+ ├── Guards
+ ├── Identifiers
+ ├── Mapping
+ ├── Primitives
+ ├── Results
+ └── Text
 ```
-## Modules Overview
-### Mapping (AutoMapper)
 
-Define mappings by implementing simple marker interfaces.
-```code
-using NDB.Kit.Mapping;
-using AutoMapper;
+---
 
-public class VehicleResponse : IMapFrom<Vehicle>
+# EF Core Helpers
+
+## 1. Safer Query Entry
+
+```csharp
+context.Query<TEntity>();
+```
+
+Applies `AsNoTracking()` by default for read-only operations.
+
+---
+
+## 2. Filtering
+
+```csharp
+query.ApplyFilters(filters, allowedFields);
+```
+
+* Uses expression trees
+* Ignores unknown fields
+* Supports:
+
+  * Equals
+  * Contains
+  * StartsWith
+  * EndsWith
+  * GreaterThan
+  * LessThan
+
+Designed to integrate with `FilterRequest` from `NDB.Abstraction`.
+
+---
+
+## 3. Search
+
+```csharp
+query.ApplySearch(keyword, searchableFields);
+```
+
+* Case-insensitive
+* Works on string properties only
+* Builds dynamic OR expressions
+
+---
+
+## 4. Sorting
+
+```csharp
+query.ApplySorts(sorts, allowedFields);
+```
+
+* Supports multi-column sort
+* Dynamically builds OrderBy / ThenBy
+* Ignores unknown fields
+
+---
+
+## 5. Paging Integration
+
+### With AutoMapper
+
+```csharp
+await query.ToPagedResultAsync<TEntity, TDto>(
+    paging,
+    mapper,
+    ct);
+```
+
+### With manual selector
+
+```csharp
+await query.ToPagedResultAsync<TEntity, TDto>(
+    paging,
+    entity => new TDto(...),
+    ct);
+```
+
+Returns `PagedResult<T>` from `NDB.Abstraction`.
+
+---
+
+## 6. List Result
+
+```csharp
+await query.ToListResultAsync<TEntity, TDto>(
+    mapper,
+    ct);
+```
+
+---
+
+## 7. Audit Integration
+
+### Save with audit
+
+```csharp
+await context.SaveWithAuditAsync();
+```
+
+### Save with audit result
+
+```csharp
+var result = await context.SaveWithAuditResultAsync();
+```
+
+Returns:
+
+```csharp
+AuditSaveResult<AuditEntry>
+```
+
+Requires `IAuditService` registration (from NDB.Audit.EF).
+
+---
+
+## 8. Tracking Guards
+
+```csharp
+context.EnsureDetached(entity);
+context.EnsureTracked(entity);
+```
+
+Helps control EF Core tracking behavior explicitly.
+
+---
+
+# AutoMapper Conventions
+
+`AutoMapping.Apply()` automatically scans assemblies and registers mapping profiles based on interfaces:
+
+* `IMapFrom<TModel, TEntity>`
+* `IMapTo<TEntity, TSource>`
+* `IMapObject<TSource, TDestination>`
+
+Example:
+
+```csharp
+public class UserDto : IMapFrom<UserDto, User>
 {
-    public Guid Id { get; set; }
-    public string EngineNumber { get; set; }
-
-    public void Mapping(IMappingExpression<Vehicle, object> map)
+    public void Mapping(IMappingExpression<User, UserDto> map)
     {
-        map.ForMember(d => d.EngineNumber,
-            opt => opt.MapFrom(s => s.EngineNumber.Trim()));
+        map.ForMember(...);
     }
 }
 ```
 
-Register once:
-```code
-services.AddAutoMapper(cfg =>
+Then register:
+
+```csharp
+AutoMapping.Apply(cfg, typeof(Startup).Assembly);
+```
+
+Removes the need for manual profile classes.
+
+---
+
+# Excel Export (OpenXML)
+
+Attribute-based export system.
+
+## Step 1: Annotate DTO
+
+```csharp
+public class ReportDto
 {
-    cfg.AddProfile(new AutoMappingProfile());
-}, Assembly.GetExecutingAssembly());
-```
+    [ExcelColumn("Name", Order = 1)]
+    public string Name { get; set; }
 
-### EF Core Helpers
-[Usages Example](src/Ef)
- 
-### Guard Clauses
-```code
-Guard.AgainstNull(request);
-Guard.AgainstEmpty(request.EngineNumber, nameof(request.EngineNumber));
-Guard.AgainstDefault(request.CompanyId, nameof(request.CompanyId));
-```
-
-### Enum Parsing
-```code
-var status = EnumHelper.ParseOrDefault(
-    request.Status,
-    ProductionStatusEnum.Unknown);
-```
-
-### Primitive Parsing
-
-```code
-var lot = Parse.Int(request.Lot);
-var amount = Parse.Decimal(request.Amount);
-var id = Parse.Guid(request.Id);
-```
-
-Returns nullable values instead of throwing.
-
-### Collection Helpers
-```code
-foreach (var (index, item) in items.WithIndex())
-{
-    Console.WriteLine($"{index}. {item}");
+    [ExcelColumn("Amount", Order = 2)]
+    public decimal Amount { get; set; }
 }
 ```
 
-### String Normalization
-```code
-var code = StringNormalize.Normalize(
-    input,
+## Step 2: Export
+
+```csharp
+var bytes = exporter.Export(data, "Report");
+```
+
+## Features
+
+* Header styling
+* Body styling
+* Numeric support
+* DateTime OADate support
+* Order validation
+* Duplicate order detection
+
+### Service registration
+
+```csharp
+services.AddNdbExcel();
+```
+
+---
+
+# Guard Clauses
+
+```csharp
+Guard.AgainstNull(value, nameof(value));
+Guard.AgainstEmpty(name, nameof(name));
+Guard.AgainstDefault(id, nameof(id));
+Guard.AgainstNegative(number, nameof(number));
+```
+
+Helps enforce early validation in application services.
+
+---
+
+# Result Flow Helpers
+
+```csharp
+ResultGuard.NotFoundIfNull(entity, "User not found");
+
+ResultGuard.FailIf(condition,
+    ResultStatus.BadRequest,
+    "Invalid state");
+```
+
+Integrates with `NDB.Abstraction.Result`.
+
+---
+
+# Primitive Parsing Helpers
+
+```csharp
+Parse.Int("123");
+Parse.Decimal("100.50");
+Parse.Guid("...");
+Parse.Bool("true");
+Parse.DateTime("2024-01-01");
+```
+
+Returns nullable types instead of throwing exceptions.
+
+---
+
+# Enum Helpers
+
+```csharp
+EnumHelper.TryParse<MyEnum>(value, out var result);
+
+EnumHelper.ParseOrDefault(value, MyEnum.Default);
+
+EnumHelper.ParseOrThrow(value);
+```
+
+---
+
+# String Normalization
+
+```csharp
+StringNormalize.Normalize(input,
     removeWhitespace: true,
     upper: true);
 ```
 
-### Result Helpers (NDB.Abstraction)
-```code
-return ResultGuard.NotFoundIfNull(vehicle, "Vehicle not found");
+Removes control characters and trims input safely.
 
-return ResultGuard.FailIf(
-    quantity <= 0,
-    "Quantity must be greater than zero");
+---
+
+# Base64 Helpers
+
+```csharp
+Base64Helper.ToBytes(base64String);
+
+Base64Helper.FromBytes(bytes, "image/png");
 ```
 
-## What NDB.Kit is NOT
-- Not a DAL
-- Not a Web framework
-- Not a UI helper library
-- Not a validation framework
-- Not a replacement for EF Core, AutoMapper, or MediatR
+Supports Data URI format automatically.
 
-## Related Libraries
-- NDB.Abstraction
-Request, result, validation, and common contracts.
+---
 
-- NDB.Audit.EF
-EF Core audit trail with old/new values and actor tracking.
+# Identifier Generator
 
-Each library is independent and can be used separately.
+```csharp
+var id = IdGenerator.NewId();
+```
 
-## Final Notes
-If you are building a clean architecture, modular monolith, or
-enterprise-grade .NET system, NDB.Kit helps you stay productive
-without sacrificing clarity or control.
+Returns uppercase, no-dash GUID string.
+
+---
+
+# Localization Utilities (Indonesian Focus)
+
+Includes helpers for:
+
+* Rupiah formatting
+* Thousand formatting
+* Terbilang (number to Indonesian words)
+* Indonesian month names
+
+Useful for government, finance, and reporting systems.
+
+---
+
+# Intended Usage
+
+```id="r9f2od"
+Application Layer
+    ↓
+NDB.Abstraction (Contracts)
+    ↓
+NDB.Kit (Implementation Helpers)
+    ↓
+Infrastructure
+```
+
+---
+
+# Non-Goals
+
+This library does not:
+
+* Replace EF Core
+* Replace AutoMapper
+* Replace FluentValidation
+* Contain domain business logic
+* Manage dependency injection automatically
+
+It provides structured utilities only.
+
+---
+
+# Versioning Policy
+
+* MAJOR → Breaking behavior changes
+* MINOR → New utilities / extensions
+* PATCH → Fixes & internal improvements
+
+---
+
+# Dependencies
+
+Depending on feature usage:
+
+* Microsoft.EntityFrameworkCore
+* AutoMapper
+* DocumentFormat.OpenXml
+* NDB.Abstraction
+* NDB.Audit.EF (optional for audit integration)
+
+---
+
+# License
+
+Choose your preferred license (MIT recommended).
+
+---
+
+# Maintained By
+
+Navigate Digital Boundaries (NDB)
